@@ -23,6 +23,38 @@ the same sequence-state model can later be mapped to CUDA paged attention.
 - Separately test generated visible output for semantic leakage of marker
   control phrases.
 
+## Current Empirical Readout
+
+The runtime mechanics are working: the Hugging Face prototype proves real
+`past_key_values` forking, and the llama.cpp/Metal worker keeps one GGUF model
+resident while using `llama_memory_seq_cp` to create branch sequence state. The
+quality results are mixed and should be treated as experimental evidence, not a
+claim that branching is generally better.
+
+Recent runs show:
+
+- Short multiple-choice QA is a poor fit for this architecture. On
+  `reports/comparative_eval_taxonomy_model_latefork_000_010.xlsx`,
+  Qwen3-30B-A3B scored branch selector `5/10`, branch oracle `6/10`,
+  monolithic reasoning `7/10`, and gated `7/10`. Branching did not beat an
+  equal-budget reasoning baseline.
+- Long-decision branching improved locality but not final judged answer
+  quality. On `reports/long_decision_30b_judged_000_003.xlsx`, forked branches
+  had higher focus (`4.25` vs sequential `3.625`) and lower contamination
+  (`1.25` vs `2.8125`), but final LLM-judge overall scores were monolithic
+  `4.67`, forked aggregate `4.33`, and sequential aggregate `4.33`.
+- Synthetic coding checkpoint branching produced the most promising qualitative
+  behavior. On `reports/coding_branch_30b_000_002.xlsx`, the planner selected
+  all expected high-risk checkpoints for both cases, average branch locality was
+  `4.78/5`, and the branch-derived patch plans covered more distinct risks than
+  the monolithic comparator. This is still synthetic, not pass/fail validated.
+- The first SWE-bench Lite probe was a useful negative result. On
+  `astropy__astropy-12907`, both branch and monolithic outputs produced valid
+  JSONL patch shape, but both edited `_separable`; the gold patch changes
+  `_cstack`. Line-numbered source and an explicit source-localization branch did
+  not fix the edit-site error. The next bottleneck is repository/source
+  localization, not KV forking.
+
 ## Run
 
 ```bash
@@ -429,6 +461,15 @@ taxonomy-model` asks the loaded model to choose 3-5 roles from the taxonomy for
 each question. The selected roles are written to `selected_branch_roles` and
 `selected_branch_count` in the per-question output.
 
+Observed result: the current late-fork MMLU-Pro setup did not demonstrate a
+branching advantage. In the 10-row Qwen3-30B-A3B run, branch accuracy was `0.50`,
+branch-oracle accuracy was `0.60`, reasoning accuracy was `0.70`, and the gate
+matched reasoning at `0.70`. The diagnostics showed low diversity
+(`avg_unique_branch_answers=1.2`) and four collapsed-weak rows. The practical
+interpretation is that if the shared question prefix already activates a wrong
+latent interpretation, suffix branch markers often fail to force a genuinely
+different answer path.
+
 `--branch-layout late-question-fork` is the original efficient path:
 
 ```text
@@ -560,6 +601,14 @@ actionability, and overall quality. The contamination scorer ignores explicit
 `TRADEOFF_BOUNDARY` text so branches are not penalized for naming what they
 intentionally did not decide.
 
+Observed result: this is the clearest evidence that localized branches are doing
+something real, but it has not yet translated into better final decisions. In
+the 3-case Qwen3-30B-A3B judged run, forked branches were more focused and less
+contaminated than sequential factor reasoning, while the final monolithic answer
+still received the best average judge score. This suggests the branch artifacts
+are useful, but the collapse pass needs stronger conflict resolution and
+evidence weighting before it can reliably beat one integrated reasoning stream.
+
 ## Coding Checkpoint Branching
 
 For coding tasks, use the multi-checkpoint branch/collapse workflow:
@@ -593,6 +642,14 @@ checkpoint collapses -> final patch plan
 The report includes selected checkpoints, branch outputs, checkpoint collapses,
 the final branch-derived patch plan, a monolithic comparator, and simple
 checkpoint/locality metrics.
+
+Observed result: this synthetic coding workflow is currently the most promising
+demonstration. In the 2-case Qwen3-30B-A3B run, the planner selected
+`method_start`, `pre_mutation`, `external_call`, and `method_end` for both
+cases, and the branch-derived final plans surfaced broader risk coverage than
+the monolithic outputs. The limitation is that these cases are not executable
+benchmarks; they measure locality and review quality, not whether a generated
+patch passes tests.
 
 ## SWE-bench Lite / Verified
 
@@ -644,3 +701,22 @@ python -m swebench.harness.run_evaluation \
 On Apple Silicon, SWE-bench documents ARM evaluation as experimental and notes
 that `--namespace ''` forces local image builds instead of pulling Linux images.
 For serious pass/fail runs, use a Linux Docker host or a cloud runner.
+
+Observed result: the first real SWE-bench Lite run generated valid prediction
+files but did not solve the selected instance. For `astropy__astropy-12907`, the
+branch path emitted a valid patch against `astropy/modeling/separable.py`, and
+the monolithic path did the same. Both changed `_separable`. The gold patch
+changes `_cstack`:
+
+```diff
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+```
+
+That failure is important. The current SWE-bench adapter uses oracle file
+localization, but it does not yet do robust function/helper localization inside
+the file. Adding line numbers, a source outline, and a `source_localization`
+branch improved inspectability but did not move this model to the correct edit
+site on the first instance. Before scaling SWE-bench, the next engineering step
+should be a repository-aware localization stage or a branch type that produces
+explicit candidate edit sites with line evidence before patch generation.
