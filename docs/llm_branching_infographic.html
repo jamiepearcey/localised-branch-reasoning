@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLM Fork and Collapse Infographic</title>
+  <style>
+    :root {
+      --bg: #f6f2ea;
+      --surface: #fffdf7;
+      --surface-2: #f1eadf;
+      --ink: #141c22;
+      --muted: #5e6a72;
+      --line: #d7cbbb;
+      --teal: #087b80;
+      --blue: #3d65a5;
+      --amber: #c1751b;
+      --green: #4f7f3a;
+      --red: #a94655;
+      --teal-soft: #d7eeee;
+      --blue-soft: #dde8f7;
+      --amber-soft: #f6e3c6;
+      --green-soft: #e0edd8;
+      --red-soft: #f1d8dd;
+      --shadow: 0 22px 60px rgba(20, 28, 34, 0.14);
+      --radius: 8px;
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 253, 247, 0.92), rgba(246, 242, 234, 0.96)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(20, 28, 34, 0.035) 0,
+          rgba(20, 28, 34, 0.035) 1px,
+          transparent 1px,
+          transparent 44px
+        );
+      color: var(--ink);
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      width: min(1320px, calc(100vw - 28px));
+      margin: 0 auto;
+      padding: 14px 0 26px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 10px;
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: var(--teal);
+      font-size: 0.76rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 720px;
+      margin: 0;
+      font-size: clamp(2rem, 3.2vw, 3rem);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      max-width: 830px;
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: clamp(0.96rem, 1.25vw, 1.04rem);
+      line-height: 1.48;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .button {
+      min-width: 108px;
+      height: 42px;
+      border: 1px solid rgba(20, 28, 34, 0.18);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(20, 28, 34, 0.08);
+      cursor: pointer;
+    }
+
+    .button:hover {
+      border-color: rgba(20, 28, 34, 0.36);
+      transform: translateY(-1px);
+    }
+
+    .stage-list {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 7px;
+      margin-bottom: 10px;
+      padding: 7px;
+      border: 1px solid rgba(20, 28, 34, 0.1);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 247, 0.78);
+      box-shadow: 0 12px 34px rgba(20, 28, 34, 0.07);
+    }
+
+    .stage {
+      position: relative;
+      min-height: 58px;
+      padding: 9px 11px 8px;
+      border: 1px solid rgba(20, 28, 34, 0.1);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.72);
+      overflow: hidden;
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--line);
+      transition: background-color 200ms ease, width 200ms ease;
+    }
+
+    .stage.is-active {
+      background: #fff;
+      box-shadow: inset 0 0 0 1px rgba(20, 28, 34, 0.08);
+    }
+
+    .stage.is-active::before {
+      width: 8px;
+      background: var(--stage-color);
+    }
+
+    .stage strong {
+      display: block;
+      font-size: 0.8rem;
+      line-height: 1.2;
+    }
+
+    .stage span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      line-height: 1.35;
+    }
+
+    .stage:nth-child(1) { --stage-color: var(--teal); }
+    .stage:nth-child(2) { --stage-color: var(--amber); }
+    .stage:nth-child(3) { --stage-color: var(--blue); }
+    .stage:nth-child(4) { --stage-color: var(--red); }
+    .stage:nth-child(5) { --stage-color: var(--green); }
+
+    .progress {
+      height: 6px;
+      margin: -2px 8px 10px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: rgba(20, 28, 34, 0.09);
+    }
+
+    .progress span {
+      display: block;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(0);
+      transform-origin: left center;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--teal), var(--amber), var(--blue), var(--red), var(--green));
+    }
+
+    .board {
+      position: relative;
+      min-height: 0;
+      padding: 18px;
+      border: 1px solid rgba(20, 28, 34, 0.13);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 247, 0.74);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .flow {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .wire {
+      fill: none;
+      stroke: rgba(20, 28, 34, 0.18);
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+
+    .wire.hot {
+      stroke-dasharray: 14 14;
+      stroke-width: 5;
+      opacity: 0.12;
+      animation: march 1.1s linear infinite;
+      transition: opacity 240ms ease;
+    }
+
+    [data-phase="0"] .wire.prompt,
+    [data-phase="0"] .wire.model,
+    [data-phase="1"] .wire.prompt,
+    [data-phase="1"] .wire.model,
+    [data-phase="2"] .wire.branch,
+    [data-phase="3"] .wire.branch,
+    [data-phase="3"] .wire.score,
+    [data-phase="4"] .wire.score,
+    [data-phase="4"] .wire.final {
+      opacity: 1;
+    }
+
+    .wire.prompt { stroke: var(--teal); }
+    .wire.model { stroke: var(--amber); }
+    .wire.branch-a { stroke: var(--teal); }
+    .wire.branch-b { stroke: var(--blue); }
+    .wire.branch-c { stroke: var(--amber); }
+    .wire.score { stroke: var(--red); }
+    .wire.final { stroke: var(--green); }
+
+    @keyframes march {
+      to { stroke-dashoffset: -28; }
+    }
+
+    .token {
+      filter: drop-shadow(0 5px 9px rgba(20, 28, 34, 0.25));
+    }
+
+    .diagram-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 0.86fr 1.12fr 1.38fr 0.82fr 1.02fr;
+      grid-template-rows: 150px 230px 150px;
+      gap: 14px;
+      height: 558px;
+      min-height: 0;
+    }
+
+    .card {
+      min-width: 0;
+      border: 1px solid rgba(20, 28, 34, 0.14);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 17px 38px rgba(20, 28, 34, 0.1);
+      overflow: hidden;
+      transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease, opacity 220ms ease;
+    }
+
+    .card.is-active {
+      border-color: color-mix(in srgb, var(--accent), #ffffff 30%);
+      box-shadow: 0 22px 48px rgba(20, 28, 34, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .card-head {
+      display: flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 13px 9px;
+      border-bottom: 1px solid rgba(20, 28, 34, 0.09);
+      background: var(--surface);
+    }
+
+    .title {
+      min-width: 0;
+      font-size: 0.94rem;
+      font-weight: 950;
+      line-height: 1.12;
+    }
+
+    .kicker {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 850;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .chip {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      border-radius: 99px;
+      background: var(--chip-bg);
+      color: var(--chip-ink);
+      font-size: 0.68rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .card-body {
+      padding: 10px;
+    }
+
+    .prompt-card {
+      grid-column: 1;
+      grid-row: 2;
+      align-self: center;
+      --accent: var(--teal);
+      --chip-bg: var(--teal-soft);
+      --chip-ink: #07575a;
+    }
+
+    .model-card {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: center;
+      --accent: var(--amber);
+      --chip-bg: var(--amber-soft);
+      --chip-ink: #74440e;
+    }
+
+    .branch-a {
+      grid-column: 3;
+      grid-row: 1;
+      --accent: var(--teal);
+      --chip-bg: var(--teal-soft);
+      --chip-ink: #07575a;
+    }
+
+    .branch-b {
+      grid-column: 3;
+      grid-row: 2;
+      --accent: var(--blue);
+      --chip-bg: var(--blue-soft);
+      --chip-ink: #274b7a;
+    }
+
+    .branch-c {
+      grid-column: 3;
+      grid-row: 3;
+      --accent: var(--amber);
+      --chip-bg: var(--amber-soft);
+      --chip-ink: #74440e;
+    }
+
+    .rank-card {
+      grid-column: 4;
+      grid-row: 2;
+      align-self: center;
+      --accent: var(--red);
+      --chip-bg: var(--red-soft);
+      --chip-ink: #7e3140;
+    }
+
+    .final-card {
+      grid-column: 5;
+      grid-row: 2;
+      align-self: center;
+      --accent: var(--green);
+      --chip-bg: var(--green-soft);
+      --chip-ink: #355c2a;
+    }
+
+    .prompt-box,
+    .answer-box {
+      min-height: 86px;
+      padding: 13px;
+      border: 1px solid rgba(20, 28, 34, 0.11);
+      border-radius: 6px;
+      background: linear-gradient(180deg, #fff, rgba(246, 242, 234, 0.56));
+      font-family: "SFMono-Regular", ui-monospace, Consolas, monospace;
+      font-size: 0.82rem;
+      line-height: 1.46;
+      white-space: pre-wrap;
+    }
+
+    .model-core {
+      position: relative;
+      display: grid;
+      min-height: 116px;
+      place-items: center;
+      border: 1px solid rgba(20, 28, 34, 0.12);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at center, rgba(255, 255, 255, 0.92) 0 35%, transparent 36%),
+        conic-gradient(from 35deg, var(--amber-soft), var(--teal-soft), var(--blue-soft), var(--amber-soft));
+      overflow: hidden;
+    }
+
+    .model-core::before,
+    .model-core::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .model-core::before {
+      width: 96px;
+      height: 96px;
+      border: 1px dashed rgba(20, 28, 34, 0.28);
+      animation: spin 10s linear infinite;
+    }
+
+    .model-core::after {
+      width: 58px;
+      height: 58px;
+      background: rgba(255, 255, 255, 0.66);
+      box-shadow: inset 0 0 0 1px rgba(20, 28, 34, 0.12);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .model-label {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      justify-items: center;
+      gap: 5px;
+      max-width: 128px;
+      text-align: center;
+      font-size: 1.08rem;
+      font-weight: 950;
+      line-height: 1.05;
+    }
+
+    .model-label span {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .fork-callout {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid rgba(193, 117, 27, 0.28);
+      border-radius: 6px;
+      background: rgba(246, 227, 198, 0.46);
+      color: #67400e;
+      font-size: 0.79rem;
+      font-weight: 850;
+      line-height: 1.35;
+    }
+
+    .fork-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 0 0 rgba(193, 117, 27, 0.36);
+      animation: pulse 1.6s ease-out infinite;
+    }
+
+    @keyframes pulse {
+      to {
+        box-shadow: 0 0 0 16px rgba(193, 117, 27, 0);
+      }
+    }
+
+    .branch-text {
+      min-height: 42px;
+      color: #28343d;
+      font-size: 0.88rem;
+      line-height: 1.48;
+    }
+
+    .branch-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .mini {
+      min-width: 0;
+      padding: 6px;
+      border-radius: 6px;
+      background: rgba(20, 28, 34, 0.055);
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .branch-card {
+      opacity: 0.45;
+    }
+
+    [data-phase="2"] .branch-card,
+    [data-phase="3"] .branch-card,
+    [data-phase="4"] .branch-card {
+      opacity: 1;
+    }
+
+    .rank-list {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .rank-list li {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px;
+      align-items: center;
+      color: #33404a;
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    .rank-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--dot);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--dot), #ffffff 76%);
+    }
+
+    .bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: rgba(20, 28, 34, 0.08);
+    }
+
+    .bar span {
+      display: block;
+      width: var(--w);
+      height: 100%;
+      border-radius: inherit;
+      background: var(--dot);
+      transform: scaleX(0.12);
+      transform-origin: left center;
+      transition: transform 430ms ease;
+    }
+
+    .rank-card.is-active .bar span,
+    [data-phase="4"] .rank-card .bar span {
+      transform: scaleX(1);
+    }
+
+    .decision {
+      margin-top: 13px;
+      padding: 10px;
+      border: 1px solid rgba(169, 70, 85, 0.26);
+      border-radius: 6px;
+      background: rgba(241, 216, 221, 0.5);
+      color: #68303b;
+      font-size: 0.78rem;
+      font-weight: 900;
+      line-height: 1.34;
+    }
+
+    .final-text {
+      min-height: 116px;
+      padding: 13px;
+      border: 1px solid rgba(79, 127, 58, 0.26);
+      border-radius: 6px;
+      background: rgba(224, 237, 216, 0.58);
+      color: #253b20;
+      font-size: 0.91rem;
+      line-height: 1.48;
+    }
+
+    .collapsed {
+      display: inline-flex;
+      margin-top: 12px;
+      padding: 7px 9px;
+      border-radius: 6px;
+      background: var(--green);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 950;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.25;
+      transform: translateY(4px);
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+
+    .final-card.is-active .collapsed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .caret::after {
+      content: "";
+      display: inline-block;
+      width: 0.52em;
+      height: 1.05em;
+      margin-left: 2px;
+      background: currentColor;
+      transform: translateY(0.18em);
+      animation: blink 820ms steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    .simple-note {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .note {
+      padding: 14px;
+      border: 1px solid rgba(20, 28, 34, 0.11);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.76);
+      box-shadow: 0 10px 26px rgba(20, 28, 34, 0.07);
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.86rem;
+    }
+
+    .note span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.38;
+    }
+
+    .is-paused *,
+    .is-paused *::before,
+    .is-paused *::after {
+      animation-play-state: paused !important;
+    }
+
+    @media (max-width: 1120px) {
+      .hero {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+
+      .controls {
+        justify-content: flex-start;
+      }
+
+      .stage-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .board {
+        min-height: 0;
+      }
+
+      .flow {
+        display: none;
+      }
+
+      .diagram-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+        height: auto;
+        min-height: 0;
+      }
+
+      .prompt-card,
+      .model-card,
+      .branch-a,
+      .branch-b,
+      .branch-c,
+      .rank-card,
+      .final-card {
+        grid-column: 1;
+        grid-row: auto;
+      }
+
+      .simple-note {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        width: min(100vw - 20px, 620px);
+        padding-top: 16px;
+      }
+
+      .stage-list {
+        grid-template-columns: 1fr;
+      }
+
+      .board {
+        padding: 14px;
+      }
+
+      .controls {
+        width: 100%;
+      }
+
+      .button {
+        min-width: 0;
+        flex: 1 1 0;
+      }
+
+      .branch-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body data-phase="0">
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">LLM fork and collapse</p>
+        <h1>Fork. Explore. Collapse.</h1>
+        <p class="subhead">
+          The model writes one answer, decides a fork is useful, tries multiple continuations, then merges the best work back into one visible response.
+        </p>
+      </div>
+      <div class="controls" aria-label="Animation controls">
+        <button class="button" id="playPause" type="button">Pause</button>
+        <button class="button" id="restart" type="button">Restart</button>
+      </div>
+    </header>
+
+    <section class="stage-list" aria-label="Process stages">
+      <div class="stage is-active" data-stage="0">
+        <strong>1. Start writing</strong>
+        <span>The prompt enters the model and one draft begins.</span>
+      </div>
+      <div class="stage" data-stage="1">
+        <strong>2. Fork decision</strong>
+        <span>The model reaches a point where several next moves are plausible.</span>
+      </div>
+      <div class="stage" data-stage="2">
+        <strong>3. Explore paths</strong>
+        <span>Multiple continuations run from the same context.</span>
+      </div>
+      <div class="stage" data-stage="3">
+        <strong>4. Compare</strong>
+        <span>Branches are scored for usefulness, risk, and coverage.</span>
+      </div>
+      <div class="stage" data-stage="4">
+        <strong>5. Collapse</strong>
+        <span>The selected material becomes one answer stream again.</span>
+      </div>
+    </section>
+    <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+
+    <section class="board" aria-label="Animated diagram">
+      <svg class="flow" viewBox="0 0 1280 720" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 Z" fill="rgba(20, 28, 34, 0.28)"></path>
+          </marker>
+          <path id="p1" d="M116 360 C165 360 190 360 235 360"></path>
+          <path id="p2" d="M390 360 C440 360 465 360 512 360"></path>
+          <path id="pa" d="M512 360 C548 230 591 130 665 108"></path>
+          <path id="pb" d="M512 360 C568 360 603 360 665 360"></path>
+          <path id="pc" d="M512 360 C548 490 591 590 665 612"></path>
+          <path id="ra" d="M840 108 C896 160 915 260 936 360"></path>
+          <path id="rb" d="M840 360 C880 360 900 360 936 360"></path>
+          <path id="rc" d="M840 612 C896 560 915 460 936 360"></path>
+          <path id="pf" d="M1048 360 C1096 360 1120 360 1164 360"></path>
+        </defs>
+
+        <path class="wire" d="M116 360 C165 360 190 360 235 360" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M390 360 C440 360 465 360 512 360" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M512 360 C548 230 591 130 665 108" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M512 360 C568 360 603 360 665 360" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M512 360 C548 490 591 590 665 612" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M840 108 C896 160 915 260 936 360" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M840 360 C880 360 900 360 936 360" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M840 612 C896 560 915 460 936 360" marker-end="url(#arrow)"></path>
+        <path class="wire" d="M1048 360 C1096 360 1120 360 1164 360" marker-end="url(#arrow)"></path>
+
+        <path class="wire hot prompt" d="M116 360 C165 360 190 360 235 360"></path>
+        <path class="wire hot model" d="M390 360 C440 360 465 360 512 360"></path>
+        <path class="wire hot branch branch-a" d="M512 360 C548 230 591 130 665 108"></path>
+        <path class="wire hot branch branch-b" d="M512 360 C568 360 603 360 665 360"></path>
+        <path class="wire hot branch branch-c" d="M512 360 C548 490 591 590 665 612"></path>
+        <path class="wire hot score" d="M840 108 C896 160 915 260 936 360"></path>
+        <path class="wire hot score" d="M840 360 C880 360 900 360 936 360"></path>
+        <path class="wire hot score" d="M840 612 C896 560 915 460 936 360"></path>
+        <path class="wire hot final" d="M1048 360 C1096 360 1120 360 1164 360"></path>
+
+        <circle class="token" r="7" fill="#087b80">
+          <animateMotion dur="4s" repeatCount="indefinite"><mpath href="#p1"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="7" fill="#c1751b">
+          <animateMotion dur="4.4s" repeatCount="indefinite" begin="1s"><mpath href="#p2"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="6" fill="#087b80">
+          <animateMotion dur="5.4s" repeatCount="indefinite" begin="1.8s"><mpath href="#pa"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="6" fill="#3d65a5">
+          <animateMotion dur="5.4s" repeatCount="indefinite" begin="2.2s"><mpath href="#pb"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="6" fill="#c1751b">
+          <animateMotion dur="5.4s" repeatCount="indefinite" begin="2.6s"><mpath href="#pc"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="6" fill="#a94655">
+          <animateMotion dur="5.5s" repeatCount="indefinite" begin="3.2s"><mpath href="#ra"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="6" fill="#a94655">
+          <animateMotion dur="5.5s" repeatCount="indefinite" begin="3.55s"><mpath href="#rb"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="6" fill="#a94655">
+          <animateMotion dur="5.5s" repeatCount="indefinite" begin="3.9s"><mpath href="#rc"></mpath></animateMotion>
+        </circle>
+        <circle class="token" r="8" fill="#4f7f3a">
+          <animateMotion dur="4.6s" repeatCount="indefinite" begin="4.2s"><mpath href="#pf"></mpath></animateMotion>
+        </circle>
+      </svg>
+
+      <div class="diagram-grid">
+        <article class="card prompt-card is-active" id="promptCard">
+          <div class="card-head">
+            <div class="title">Prompt and context<span class="kicker">same starting point</span></div>
+            <span class="chip">input</span>
+          </div>
+          <div class="card-body">
+            <div class="prompt-box">
+User asks a hard question.
+
+The model begins one answer from the shared conversation context.</div>
+          </div>
+        </article>
+
+        <article class="card model-card" id="modelCard">
+          <div class="card-head">
+            <div class="title">LLM writing<span class="kicker">one stream first</span></div>
+            <span class="chip">model</span>
+          </div>
+          <div class="card-body">
+            <div class="model-core" aria-label="LLM model">
+              <div class="model-label">LLM<span id="modelState">writing</span></div>
+            </div>
+            <div class="fork-callout">
+              <span class="fork-dot" aria-hidden="true"></span>
+              <span id="forkText">Continue normally until a useful fork point appears.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card branch-card branch-a" data-branch-card>
+          <div class="card-head">
+            <div class="title">Continuation A<span class="kicker">direct answer</span></div>
+            <span class="chip">path 1</span>
+          </div>
+          <div class="card-body">
+            <div class="branch-text caret" id="branchA"></div>
+            <div class="branch-meta">
+              <span class="mini">clear</span>
+              <span class="mini">fast</span>
+              <span class="mini">narrow</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card branch-card branch-b" data-branch-card>
+          <div class="card-head">
+            <div class="title">Continuation B<span class="kicker">edge cases</span></div>
+            <span class="chip">path 2</span>
+          </div>
+          <div class="card-body">
+            <div class="branch-text caret" id="branchB"></div>
+            <div class="branch-meta">
+              <span class="mini">tests risk</span>
+              <span class="mini">slower</span>
+              <span class="mini">safer</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card branch-card branch-c" data-branch-card>
+          <div class="card-head">
+            <div class="title">Continuation C<span class="kicker">simple version</span></div>
+            <span class="chip">path 3</span>
+          </div>
+          <div class="card-body">
+            <div class="branch-text caret" id="branchC"></div>
+            <div class="branch-meta">
+              <span class="mini">concise</span>
+              <span class="mini">readable</span>
+              <span class="mini">less depth</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card rank-card" id="rankCard">
+          <div class="card-head">
+            <div class="title">Compare<span class="kicker">rank or merge</span></div>
+            <span class="chip">judge</span>
+          </div>
+          <div class="card-body">
+            <ul class="rank-list">
+              <li style="--dot: var(--teal)">
+                <span class="rank-dot"></span>
+                <div class="bar"><span style="--w: 82%"></span></div>
+                <span>A</span>
+              </li>
+              <li style="--dot: var(--blue)">
+                <span class="rank-dot"></span>
+                <div class="bar"><span style="--w: 94%"></span></div>
+                <span>B</span>
+              </li>
+              <li style="--dot: var(--amber)">
+                <span class="rank-dot"></span>
+                <div class="bar"><span style="--w: 74%"></span></div>
+                <span>C</span>
+              </li>
+            </ul>
+            <div class="decision" id="decisionText">Waiting for continuations...</div>
+          </div>
+        </article>
+
+        <article class="card final-card" id="finalCard">
+          <div class="card-head">
+            <div class="title">One answer again<span class="kicker">collapsed stream</span></div>
+            <span class="chip">output</span>
+          </div>
+          <div class="card-body">
+            <div class="final-text caret" id="finalText"></div>
+            <span class="collapsed">collapsed</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="simple-note" aria-label="Plain English explanation">
+      <div class="note">
+        <strong>Fork means "try options"</strong>
+        <span>The model does not need to commit immediately when several next tokens or strategies look promising.</span>
+      </div>
+      <div class="note">
+        <strong>Branches are private drafts</strong>
+        <span>The user sees the final answer, not every branch trial or control instruction used to steer it.</span>
+      </div>
+      <div class="note">
+        <strong>Collapse means "commit"</strong>
+        <span>The system picks, merges, or continues the useful branch work and resumes as one normal response.</span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const duration = 21000;
+    const phases = [
+      { until: 4300, phase: 0 },
+      { until: 7000, phase: 1 },
+      { until: 14500, phase: 2 },
+      { until: 17500, phase: 3 },
+      { until: duration, phase: 4 }
+    ];
+
+    const text = {
+      a: "Answer directly: give the clearest explanation first and skip details that do not change the outcome.",
+      b: "Check the edge cases: what could go wrong, what evidence matters, and which assumptions need testing?",
+      c: "Simplify the phrasing: draft, fork, explore, compare, collapse into one response.",
+      final:
+        "The LLM starts with one draft. At a useful uncertainty point, it forks several continuations from the same context. Those branches are compared, the useful material is selected or merged, and the model continues as one visible answer."
+    };
+
+    const body = document.body;
+    const progress = document.getElementById("progressBar");
+    const stages = Array.from(document.querySelectorAll(".stage"));
+    const cards = {
+      prompt: document.getElementById("promptCard"),
+      model: document.getElementById("modelCard"),
+      rank: document.getElementById("rankCard"),
+      final: document.getElementById("finalCard")
+    };
+    const branchCards = Array.from(document.querySelectorAll("[data-branch-card]"));
+    const branchA = document.getElementById("branchA");
+    const branchB = document.getElementById("branchB");
+    const branchC = document.getElementById("branchC");
+    const finalText = document.getElementById("finalText");
+    const forkText = document.getElementById("forkText");
+    const modelState = document.getElementById("modelState");
+    const decisionText = document.getElementById("decisionText");
+    const playPause = document.getElementById("playPause");
+    const restart = document.getElementById("restart");
+    const svg = document.querySelector("svg");
+
+    let startedAt = performance.now();
+    let paused = false;
+    let pausedElapsed = 0;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function typed(value, start, end, elapsed) {
+      const progressValue = clamp((elapsed - start) / (end - start), 0, 1);
+      return value.slice(0, Math.floor(value.length * progressValue));
+    }
+
+    function phaseFor(elapsed) {
+      return phases.find((item) => elapsed < item.until).phase;
+    }
+
+    function activateCard(card, active) {
+      card.classList.toggle("is-active", active);
+    }
+
+    function render(now) {
+      const elapsed = (now - startedAt) % duration;
+      const phase = phaseFor(elapsed);
+      body.dataset.phase = String(phase);
+      progress.style.transform = `scaleX(${elapsed / duration})`;
+
+      stages.forEach((stage) => {
+        stage.classList.toggle("is-active", Number(stage.dataset.stage) === phase);
+      });
+
+      activateCard(cards.prompt, phase === 0);
+      activateCard(cards.model, phase === 0 || phase === 1);
+      activateCard(cards.rank, phase === 3);
+      activateCard(cards.final, phase === 4);
+
+      branchCards.forEach((card, index) => {
+        const isActive = phase === 2 || (phase === 3 && index < 3);
+        card.classList.toggle("is-active", isActive);
+      });
+
+      if (phase === 0) {
+        modelState.textContent = "writing";
+        forkText.textContent = "Continue normally until a useful fork point appears.";
+        decisionText.textContent = "Waiting for continuations...";
+      } else if (phase === 1) {
+        modelState.textContent = "fork?";
+        forkText.textContent = "The model chooses to branch because several next moves look useful.";
+        decisionText.textContent = "Waiting for continuations...";
+      } else if (phase === 2) {
+        modelState.textContent = "forked";
+        forkText.textContent = "Each branch starts from the same context and tries a different continuation.";
+        decisionText.textContent = "Waiting for continuations...";
+      } else if (phase === 3) {
+        modelState.textContent = "compare";
+        forkText.textContent = "The branch trials are complete enough to compare.";
+        decisionText.textContent = "Merge B's caution with A's clarity and C's wording.";
+      } else {
+        modelState.textContent = "collapsed";
+        forkText.textContent = "The branch work has collapsed back into one normal output stream.";
+        decisionText.textContent = "Collapse selected material into the answer.";
+      }
+
+      branchA.textContent = typed(text.a, 7200, 11800, elapsed);
+      branchB.textContent = typed(text.b, 8000, 12800, elapsed);
+      branchC.textContent = typed(text.c, 8800, 13700, elapsed);
+      finalText.textContent = typed(text.final, 17600, 20600, elapsed);
+    }
+
+    function loop(now) {
+      if (!paused) render(now);
+      requestAnimationFrame(loop);
+    }
+
+    playPause.addEventListener("click", () => {
+      paused = !paused;
+      if (paused) {
+        pausedElapsed = (performance.now() - startedAt) % duration;
+        playPause.textContent = "Play";
+        body.classList.add("is-paused");
+        if (svg && svg.pauseAnimations) svg.pauseAnimations();
+      } else {
+        startedAt = performance.now() - pausedElapsed;
+        playPause.textContent = "Pause";
+        body.classList.remove("is-paused");
+        if (svg && svg.unpauseAnimations) svg.unpauseAnimations();
+      }
+    });
+
+    restart.addEventListener("click", () => {
+      startedAt = performance.now();
+      pausedElapsed = 0;
+      if (paused) {
+        paused = false;
+        playPause.textContent = "Pause";
+        body.classList.remove("is-paused");
+        if (svg && svg.unpauseAnimations) svg.unpauseAnimations();
+      }
+      render(performance.now());
+    });
+
+    render(performance.now());
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

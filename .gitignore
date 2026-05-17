@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+reports/
+build/
+models/
+data/*.jsonl
+adapters/
+.pytest_cache/
+.venv/

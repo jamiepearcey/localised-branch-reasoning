@@ -1,0 +1,72 @@
+question_id,category,question,expected_answer
+mmlu-pro-934,mmlu-pro/law/ori_mmlu-professional_law,"A 35-year-old man with some experience as a truck driver owned a lumber truck. One day, the man set out driving his truck, heavily loaded with lumber, down a mountain road. Sitting next to the man in the passenger seat was a 19-year-old helper. During the course of the trip, when the truck was going down a long hill, the brakes failed. The man shouted to the helper to jump, but the teenager refused to do so and shouted back to the man that he should try to steer the truck down the hill. The man then opened the door on the passenger's side of the truck and negligently pushed the helper out. The helper, who suffered a broken leg, was rushed to the hospital where he was treated for his injury. As the helper was recuperating, a nurse inadvertently mixed up his chart with that of the female patient in the next room. The nurse gave the helper a fertility pill that made him sterile. If the helper brings suit against the man to recover damages for his sterility, the man will
+
+Options:
+A. not recover, because the man had no control over the hospital's actions.
+B. recover, because the man failed to properly instruct the helper on emergency procedures.
+C. not recover, because the man's actions were intended to save the helper's life.
+D. not recover, because the nurse's negligence in giving the wrong medication is unrelated to the man's actions.
+E. recover, because the man was responsible for the helper's safety while in the truck.
+F. recover, because the man was negligent in his maintenance of the truck's brakes.
+G. recover, because the man was negligent in pushing the helper out of the truck.
+H. not recover, because it is not foreseeable that a patient would be injured in such a manner.
+I. recover, because it is foreseeable that a hospital can be negligent in its care of patients.
+
+Answer with the option letter and the answer text.","G. recover, because the man was negligent in pushing the helper out of the truck."
+mmlu-pro-1519,mmlu-pro/law/ori_mmlu-professional_law,"A woman was hit in the right eye by a shard of glass when her car was rear-ended by an industrial truck. She was hospitalized, lost her eye, and had several operations over several years. She could not return to work as an apprentice ballet dancer due to loss of coordination, constant headaches, and severe disfigurement. She is considered totally disabled. She had been training for the ballet for many years and, at the trial against the tortfeasor, she proved that she was considered a bright and uncoming student. The defendant claimed that this was still too speculative whether she would have been successful. The trial court disagreed and allowed evidence on the lost earning capacity of a ballet dancer. The jury awarded $3 million. Will the appellate court likely reverse the verdict due to the lost earning capacity issue?
+
+Options:
+A. Yes, because the damages awarded are excessive and not substantiated by concrete proof of earning capacity.
+B. Yes, because the plaintiff failed to prove that she would have definitely become a successful professional ballet dancer.
+C. Yes, because the defendant has the right to challenge the amount of the award given by the jury.
+D. Yes, the evidence did not guarantee or assure anyone that she really would have been a successful professional ballet dancer.
+E. No, the jury's award is discretionary and inviolate, and it may not be disturbed with respect to personal injury damages.
+F. Yes, she can only collect for lost work that she held prior to the accident; her future lost earning capacity could be based on an apprentice ballet dancer.
+G. No, because some imprecision in the evidence regarding loss of earning capacity is to be expected and is not grounds for excluding the evidence.
+
+Answer with the option letter and the answer text.","G. No, because some imprecision in the evidence regarding loss of earning capacity is to be expected and is not grounds for excluding the evidence."
+mmlu-pro-4499,mmlu-pro/chemistry/stemez-PhysicalChemistry,"For the reaction 4C_2H_5Cl(g) + 13O_2(g) = 2 Cl_2 (g) + 8 CO_2 (g) + 10 H_2O (g) , \DeltaH_298°K = - 1229.6 kcal . Also, the heat of combustion per mole of C_2H_6 (g) to CO_2 (g) and H_2O (g) = - 341 kcal, the heat of formation per mole of H_2O (g) = - 57.8 kcal and the heat of formation per mole of HCl(g) = - 2.1 kcal. For the reaction C_2H_6 (g) + Cl_2 (g) = C_2H_5Cl(g) + HCl(g) (a) Calculate \DeltaH_298°K (b) Calculate \DeltaH_398°K for the first reaction assuming \DeltaC_P = - 10 cal/deg (c) Calculate \DeltaE_298°k for the first reaction
+
+Options:
+A. - 110 kcal, - 1240.6 kcal, - 1241.4 kcal
+B. - 107 kcal, - 1242.6 kcal, - 1243.4 kcal
+C. - 108 kcal, - 1238.6 kcal, - 1239.4 kcal
+D. - 115 kcal, - 1232.6 kcal, - 1233.4 kcal
+E. - 100 kcal, - 1225.6 kcal, - 1226.4 kcal
+F. - 120 kcal, - 1250.6 kcal, - 1235.4 kcal
+G. - 112 kcal, - 1245.6 kcal, - 1246.4 kcal
+H. - 103 kcal, - 1230.6 kcal, - 1231.4 kcal
+I. - 105 kcal, - 1235.6 kcal, - 1236.4 kcal
+J. - 98 kcal, - 1228.6 kcal, - 1229.4 kcal
+
+Answer with the option letter and the answer text.","H. - 103 kcal, - 1230.6 kcal, - 1231.4 kcal"
+mmlu-pro-4517,mmlu-pro/chemistry/ori_mmlu-college_chemistry,"The 99Ru chemical shift of [Ru(H2O)6]2+ is 16,050 ppm relative to [Ru(CN)6]2- at 0 ppm. The electronic excitation energies of [Ru(H2O)6]2+, [Ru(CN)6]2- and [Ru(NH3)6]2+ are 18,900, 40,000 and 25,600 cm-1 respectively. Assuming that the chemical shift differences are dominated by paramagnetic currents, determine the chemical shift of [Ru(NH3)6]2+.
+
+Options:
+A. 17,030 ppm
+B. 7,530 ppm
+C. 12,760 ppm
+D. 11,070 ppm
+E. 8,090 ppm
+F. 15,920 ppm
+G. 9,200 ppm
+H. 13,870 ppm
+I. 14,840 ppm
+J. 10,500 ppm
+
+Answer with the option letter and the answer text.","E. 8,090 ppm"
+mmlu-pro-6839,mmlu-pro/economics/ori_mmlu-high_school_microeconomics,"The market for Cincinnati Reds baseball tickets is currently in equilibrium. Which of the following events would most likely increase the consumer surplus received by Reds fans?
+
+Options:
+A. The Reds decrease ticket prices due to lower stadium maintenance costs.
+B. The Reds launch a new marketing campaign that increases ticket demand.
+C. The Reds decide to limit the number of games in a season.
+D. The Reds offer discounted parking for all home games.
+E. The Reds increase ticket prices due to a rise in player salaries.
+F. The Reds announce an increase in the price of merchandise at the stadium.
+G. The city of Cincinnati imposes an entertainment tax on all sports events.
+H. The Reds increase hot dog prices to reflect a higher cost of buns.
+I. The city of Cincinnati is undertaking a huge highway construction project that strands fans in pregame traffic jams for hours.
+J. The Reds must increase ticket prices to afford the most talented players.
+
+Answer with the option letter and the answer text.",D. The Reds offer discounted parking for all home games.

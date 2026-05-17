@@ -1,0 +1,33 @@
+[project]
+name = "localised-reasoning-test"
+version = "0.1.0"
+description = "Prototype KV-cache forking and hidden continuation markers for localized reasoning experiments."
+requires-python = ">=3.11"
+dependencies = [
+  "pandas",
+  "torch",
+  "transformers",
+]
+
+[project.optional-dependencies]
+qa-report = [
+  "openpyxl",
+]
+benchmarks = [
+  "huggingface_hub",
+  "pyarrow",
+]
+cuda-train = [
+  "accelerate",
+  "bitsandbytes",
+  "datasets",
+  "peft",
+  "trl",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
