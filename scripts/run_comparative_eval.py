@@ -11,12 +11,14 @@ from localised_reasoning.comparative_eval import (
     DEFAULT_BRANCH_REASONING_TOKENS,
     DEFAULT_SELECTOR_TOKENS,
     LiveLlamaComparativeEngine,
+    ModelBranchScenarioSelector,
     WorkerAnswerScorer,
     build_category_summary,
     build_comparative_eval,
     default_benchmark_scenarios,
     default_real_world_eval_questions,
     export_comparative_eval_excel,
+    fallback_taxonomy_scenarios,
 )
 from localised_reasoning.qa_scenarios import ReasoningBudget, default_scenarios, export_qa_csv
 
@@ -69,6 +71,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--branch-max-new-tokens", type=int, default=DEFAULT_BRANCH_REASONING_TOKENS)
     parser.add_argument("--judge-max-new-tokens", type=int, default=DEFAULT_SELECTOR_TOKENS)
     parser.add_argument(
+        "--scenario-mode",
+        choices=["fixed", "taxonomy-category", "taxonomy-model"],
+        default="fixed",
+        help="How to choose branch roles for each question.",
+    )
+    parser.add_argument(
+        "--branch-layout",
+        choices=["late-question-fork", "role-before-question"],
+        default="late-question-fork",
+        help="late-question-fork is the efficient branch-continuation architecture; role-before-question is a diagnostic accuracy probe that re-encodes the question per branch.",
+    )
+    parser.add_argument("--taxonomy-min-roles", type=int, default=3)
+    parser.add_argument("--taxonomy-max-roles", type=int, default=5)
+    parser.add_argument("--taxonomy-selector-max-new-tokens", type=int, default=128)
+    parser.add_argument(
         "--include-sample-baseline",
         action="store_true",
         help="Also run independent non-forked branch prompts for a multi-sample baseline.",
@@ -117,7 +134,6 @@ def main() -> int:
     output_xlsx = args.output_xlsx or Path(
         "reports/comparative_eval_proxy.xlsx" if args.engine == "proxy" else "reports/comparative_eval_worker.xlsx"
     )
-    scenario_provider = default_benchmark_scenarios if args.question_source == "mmlu-pro" else None
     scenarios = default_benchmark_scenarios() if args.question_source == "mmlu-pro" else default_scenarios()
     budget = ReasoningBudget(
         branch_count=len(scenarios),
@@ -154,6 +170,7 @@ def main() -> int:
             branch_max_new_tokens=args.branch_max_new_tokens,
             judge_max_new_tokens=args.judge_max_new_tokens,
             request_timeout_s=args.request_timeout_s,
+            branch_layout=args.branch_layout,
         )
     answer_scorer = None
     if args.scorer == "worker" or (args.scorer == "auto" and args.engine != "proxy"):
@@ -165,6 +182,24 @@ def main() -> int:
             timeout_s=args.request_timeout_s,
             fallback_to_regex=not args.no_scorer_regex_fallback,
         )
+    if args.scenario_mode == "fixed":
+        scenario_provider = default_benchmark_scenarios if args.question_source == "mmlu-pro" else None
+    elif args.scenario_mode == "taxonomy-category":
+        scenario_provider = lambda question: fallback_taxonomy_scenarios(
+            question,
+            max_roles=args.taxonomy_max_roles,
+        )
+    else:
+        if args.engine == "proxy":
+            raise SystemExit("--scenario-mode taxonomy-model requires --engine worker or --engine llama-cpp")
+        selector = ModelBranchScenarioSelector(
+            worker=engine.worker,
+            min_roles=args.taxonomy_min_roles,
+            max_roles=args.taxonomy_max_roles,
+            max_new_tokens=args.taxonomy_selector_max_new_tokens,
+            timeout_s=args.request_timeout_s,
+        )
+        scenario_provider = selector.select
     try:
         def report_progress(index: int, total: int, question) -> None:
             if args.progress_every > 0 and (index == 1 or index % args.progress_every == 0 or index == total):
@@ -204,10 +239,12 @@ def main() -> int:
         output_path=output_xlsx,
     )
     print(f"wrote_xlsx={output}")
-    print(f"reasoning_budget_tokens={budget.total_tokens} ({budget.formula})")
+    print(f"reasoning_budget_tokens={int(detail_df['reasoning_budget_tokens'].mean()) if len(detail_df) else budget.total_tokens} avg")
     print(f"answer_scorer={answer_scorer.name if answer_scorer is not None else 'regex'}")
+    print(f"scenario_mode={args.scenario_mode}")
+    print(f"branch_layout={args.branch_layout}")
     print(summary_df.to_string(index=False))
-    print(detail_df[["question_id", "category", "branch_correct", "reasoning_correct", "gated_correct", "winner", "gated_winner"]].to_string(index=False))
+    print(detail_df[["question_id", "category", "selected_branch_roles", "branch_correct", "reasoning_correct", "gated_correct", "winner", "gated_winner"]].to_string(index=False))
     return 0
 
 

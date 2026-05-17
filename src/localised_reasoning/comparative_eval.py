@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
 from typing import Callable, Mapping, Protocol, Sequence
@@ -74,6 +75,18 @@ class BranchDiagnostics:
         return self.unique_answer_count <= 1 and (
             self.strong_evidence_count == 0 or self.thin_evidence_count >= self.branch_count - 1
         )
+
+
+@dataclass(frozen=True)
+class BranchTaxonomyRole:
+    label: str
+    instruction: str
+    family: str
+    applies_to: tuple[str, ...]
+    purpose: str
+
+    def as_scenario(self) -> ScenarioBranch:
+        return ScenarioBranch(self.label, self.instruction)
 
 
 class AnswerScorer(Protocol):
@@ -266,6 +279,237 @@ def default_benchmark_scenarios(question: EvalQuestion | None = None) -> list[Sc
             "Recall the relevant source, definition, theorem, mechanism, rule, or fact before using options.",
         ),
     ]
+
+
+def benchmark_branch_taxonomy() -> list[BranchTaxonomyRole]:
+    return [
+        BranchTaxonomyRole(
+            "question_target_filter",
+            "Identify the actual question target and reject irrelevant passage context, names, eras, or distractor framing before choosing.",
+            "factual_focus",
+            ("history", "law", "business", "biology", "health", "general"),
+            "Prevents answering the wrong target when the prompt contains distracting context.",
+        ),
+        BranchTaxonomyRole(
+            "source_of_truth_recall",
+            "Recall the governing fact, source, theorem, definition, mechanism, statute, or rule first, then map it to the options.",
+            "factual_focus",
+            ("history", "law", "biology", "health", "physics", "chemistry", "business", "general"),
+            "For questions where the decisive step is retrieval of a known rule or fact.",
+        ),
+        BranchTaxonomyRole(
+            "chronology_checker",
+            "Check chronology, named document, historical period, and authorship before choosing; reject at least one option from the wrong period or topic.",
+            "factual_focus",
+            ("history",),
+            "Targets historical source confusion and named-document traps.",
+        ),
+        BranchTaxonomyRole(
+            "rule_elements",
+            "Identify the governing legal, medical, accounting, or procedural rule and its required elements, then match each element to the facts.",
+            "rule_application",
+            ("law", "health", "business", "general"),
+            "For element-by-element rule matching.",
+        ),
+        BranchTaxonomyRole(
+            "exception_checker",
+            "Look specifically for exceptions, exclusions, defenses, contraindications, and special cases that could overturn the obvious answer.",
+            "rule_application",
+            ("law", "health", "business", "general"),
+            "For questions where an exception changes the answer.",
+        ),
+        BranchTaxonomyRole(
+            "fact_pattern_matcher",
+            "Match the relevant facts to each plausible option and reject options missing a required condition.",
+            "rule_application",
+            ("law", "health", "biology", "business", "general"),
+            "For dense scenario questions with multiple tempting options.",
+        ),
+        BranchTaxonomyRole(
+            "formula_mapper",
+            "Map the problem to the governing formula, theorem, conservation law, or accounting relation before doing arithmetic.",
+            "quantitative",
+            ("math", "physics", "chemistry", "business", "general"),
+            "Prevents starting from the wrong equation.",
+        ),
+        BranchTaxonomyRole(
+            "unit_conversion_checker",
+            "Check dimensions and unit conversions before selecting an option; evidence must name the converted units.",
+            "quantitative",
+            ("physics", "chemistry", "math", "business", "general"),
+            "Targets cm/mm, lifetime, currency, percentage, and dimensional mistakes.",
+        ),
+        BranchTaxonomyRole(
+            "option_backsolver",
+            "Substitute plausible answer options back into the problem and reject options that fail the check.",
+            "quantitative",
+            ("math", "physics", "chemistry", "business", "general"),
+            "Uses answer choices as constraints instead of doing only forward solving.",
+        ),
+        BranchTaxonomyRole(
+            "magnitude_estimator",
+            "Estimate the order of magnitude or rough scale independently, then reject options outside that scale.",
+            "quantitative",
+            ("physics", "chemistry", "math", "business", "general"),
+            "Catches arithmetic answers that are numerically plausible but scale-wrong.",
+        ),
+        BranchTaxonomyRole(
+            "distractor_eliminator",
+            "Eliminate plausible distractors before choosing; evidence must name the specific error in at least one wrong option.",
+            "option_structure",
+            ("history", "law", "biology", "health", "physics", "chemistry", "math", "business", "general"),
+            "For multiple-choice questions with nearby wrong choices.",
+        ),
+        BranchTaxonomyRole(
+            "adversarial_alternative",
+            "Assume the first plausible answer may be wrong. Test the strongest alternative option and choose only what survives.",
+            "option_structure",
+            ("history", "law", "biology", "health", "physics", "chemistry", "math", "business", "general"),
+            "For escaping a high-probability but possibly wrong first interpretation.",
+        ),
+        BranchTaxonomyRole(
+            "evidence_answer_auditor",
+            "Audit whether the evidence actually supports the selected answer; if the evidence contradicts the answer, choose the supported option.",
+            "verification",
+            ("history", "law", "biology", "health", "physics", "chemistry", "math", "business", "general"),
+            "Catches answer/evidence mismatches and selector-rationalization failures.",
+        ),
+        BranchTaxonomyRole(
+            "definition_matcher",
+            "Match the prompt to the exact definition and reject options that use nearby but incorrect concepts.",
+            "definition",
+            ("biology", "health", "chemistry", "physics", "law", "business", "general"),
+            "For terminology and mechanism questions.",
+        ),
+        BranchTaxonomyRole(
+            "mechanism_checker",
+            "Identify the biological, chemical, clinical, physical, or causal mechanism that determines the answer.",
+            "mechanism",
+            ("biology", "health", "chemistry", "physics", "general"),
+            "For mechanism-driven science and medicine questions.",
+        ),
+    ]
+
+
+def benchmark_taxonomy_scenarios(category: str | None = None) -> list[ScenarioBranch]:
+    broad = _broad_benchmark_category(category or "")
+    roles = []
+    for role in benchmark_branch_taxonomy():
+        if broad in role.applies_to or "general" in role.applies_to:
+            roles.append(role.as_scenario())
+    return roles
+
+
+def fallback_taxonomy_scenarios(question: EvalQuestion, *, max_roles: int = 5) -> list[ScenarioBranch]:
+    category = _broad_benchmark_category(question.category)
+    by_category: dict[str, tuple[str, ...]] = {
+        "history": (
+            "question_target_filter",
+            "source_of_truth_recall",
+            "chronology_checker",
+            "distractor_eliminator",
+            "evidence_answer_auditor",
+        ),
+        "law": (
+            "rule_elements",
+            "exception_checker",
+            "fact_pattern_matcher",
+            "source_of_truth_recall",
+            "evidence_answer_auditor",
+        ),
+        "health": (
+            "mechanism_checker",
+            "rule_elements",
+            "exception_checker",
+            "definition_matcher",
+            "evidence_answer_auditor",
+        ),
+        "biology": (
+            "mechanism_checker",
+            "definition_matcher",
+            "source_of_truth_recall",
+            "distractor_eliminator",
+            "evidence_answer_auditor",
+        ),
+        "math": (
+            "formula_mapper",
+            "option_backsolver",
+            "unit_conversion_checker",
+            "magnitude_estimator",
+            "evidence_answer_auditor",
+        ),
+        "physics": (
+            "formula_mapper",
+            "unit_conversion_checker",
+            "magnitude_estimator",
+            "option_backsolver",
+            "evidence_answer_auditor",
+        ),
+        "chemistry": (
+            "formula_mapper",
+            "unit_conversion_checker",
+            "mechanism_checker",
+            "option_backsolver",
+            "evidence_answer_auditor",
+        ),
+        "business": (
+            "formula_mapper",
+            "rule_elements",
+            "option_backsolver",
+            "distractor_eliminator",
+            "evidence_answer_auditor",
+        ),
+    }
+    taxonomy = {role.label: role.as_scenario() for role in benchmark_branch_taxonomy()}
+    labels = by_category.get(
+        category,
+        (
+            "question_target_filter",
+            "source_of_truth_recall",
+            "formula_mapper",
+            "distractor_eliminator",
+            "evidence_answer_auditor",
+        ),
+    )
+    return [taxonomy[label] for label in labels[:max_roles] if label in taxonomy]
+
+
+class ModelBranchScenarioSelector:
+    def __init__(
+        self,
+        *,
+        worker: LiveLlamaWorker,
+        min_roles: int = 3,
+        max_roles: int = 5,
+        max_new_tokens: int = 128,
+        timeout_s: float | None = None,
+    ) -> None:
+        self.worker = worker
+        self.min_roles = min_roles
+        self.max_roles = max_roles
+        self.max_new_tokens = max_new_tokens
+        self.timeout_s = timeout_s
+        self._taxonomy_by_label = {role.label: role for role in benchmark_branch_taxonomy()}
+
+    def select(self, question: EvalQuestion) -> list[ScenarioBranch]:
+        prompt = render_branch_taxonomy_selection_prompt(
+            question,
+            list(self._taxonomy_by_label.values()),
+            min_roles=self.min_roles,
+            max_roles=self.max_roles,
+        )
+        response = self.worker.generate(
+            prompt,
+            max_new_tokens=self.max_new_tokens,
+            stop="<|im_end|>",
+            timeout_s=self.timeout_s,
+        )
+        raw = _strip_empty_think_blocks(str(response.get("text", "")))
+        labels = _parse_selected_taxonomy_labels(raw, self._taxonomy_by_label)
+        if len(labels) < self.min_roles:
+            labels = [scenario.label for scenario in fallback_taxonomy_scenarios(question, max_roles=self.max_roles)]
+        labels = _dedupe_preserve_order(labels)[: self.max_roles]
+        return [self._taxonomy_by_label[label].as_scenario() for label in labels if label in self._taxonomy_by_label]
 
 
 class ComparativeProxyEngine:
@@ -477,7 +721,10 @@ class LiveLlamaComparativeEngine:
         judge_max_new_tokens: int = DEFAULT_SELECTOR_TOKENS,
         request_timeout_s: float | None = None,
         worker: LiveLlamaWorker | None = None,
+        branch_layout: str = "late-question-fork",
     ) -> None:
+        if branch_layout not in {"late-question-fork", "role-before-question"}:
+            raise ValueError(f"unknown branch_layout: {branch_layout}")
         self.worker = worker or LiveLlamaWorker(
             model_path=model_path,
             worker_path=worker_path,
@@ -490,6 +737,7 @@ class LiveLlamaComparativeEngine:
         self.judge_max_new_tokens = judge_max_new_tokens
         self.branch_max_new_tokens = branch_max_new_tokens
         self.request_timeout_s = request_timeout_s
+        self.branch_layout = branch_layout
         self.prefix_cache_enabled = self._install_prefix_caches()
 
     def _install_prefix_caches(self) -> bool:
@@ -521,14 +769,24 @@ class LiveLlamaComparativeEngine:
         question: EvalQuestion,
         scenarios: Sequence[ScenarioBranch],
     ) -> Mapping[str, str]:
-        worker_branches = [
-            WorkerBranch(label=scenario.label, marker=render_branch_reasoning_marker(scenario))
-            for scenario in scenarios
-        ]
+        if self.branch_layout == "role-before-question":
+            worker_branches = [
+                WorkerBranch(label=scenario.label, marker=render_branch_role_question_marker(scenario, question.question))
+                for scenario in scenarios
+            ]
+            shared_suffix = ""
+            uncached_prefix = render_branch_static_prefix()
+        else:
+            worker_branches = [
+                WorkerBranch(label=scenario.label, marker=render_branch_reasoning_marker(scenario))
+                for scenario in scenarios
+            ]
+            shared_suffix = render_branch_question_suffix(question.question)
+            uncached_prefix = _render_question_prefix(question.question)
         if self.prefix_cache_enabled:
             response = self.worker.cached_branch(
                 prefix_id=BRANCH_PREFIX_CACHE_ID,
-                suffix=render_branch_question_suffix(question.question),
+                suffix=shared_suffix,
                 branches=worker_branches,
                 max_new_tokens=self.branch_max_new_tokens,
                 stop="STOP_POINT:",
@@ -537,7 +795,7 @@ class LiveLlamaComparativeEngine:
             )
         else:
             response = self.worker.branch(
-                prefix=_render_question_prefix(question.question),
+                prefix=uncached_prefix,
                 branches=worker_branches,
                 max_new_tokens=self.branch_max_new_tokens,
                 stop="STOP_POINT:",
@@ -557,10 +815,13 @@ class LiveLlamaComparativeEngine:
         scenarios: Sequence[ScenarioBranch],
     ) -> Mapping[str, str]:
         answers: dict[str, str] = {}
-        prefix = render_branch_static_prefix() + render_branch_question_suffix(question.question)
         for index, scenario in enumerate(scenarios):
+            if self.branch_layout == "role-before-question":
+                prompt = render_branch_static_prefix() + render_branch_role_question_marker(scenario, question.question)
+            else:
+                prompt = render_branch_static_prefix() + render_branch_question_suffix(question.question) + render_branch_reasoning_marker(scenario)
             response = self.worker.generate(
-                prefix + render_branch_reasoning_marker(scenario),
+                prompt,
                 max_new_tokens=self.branch_max_new_tokens,
                 stop="STOP_POINT:",
                 timeout_s=self.request_timeout_s,
@@ -775,6 +1036,42 @@ def render_branch_question_suffix(question: str) -> str:
     )
 
 
+def render_branch_role_question_marker(scenario: ScenarioBranch, question: str) -> str:
+    if _is_structured_benchmark_scenario(scenario.label):
+        return (
+            "<|im_start|>user\n"
+            f"Branch operation: {_branch_reasoning_instruction(scenario)}\n"
+            "Use this operation while reading the question. Do the named operation explicitly; "
+            "do not merely solve normally under a different label. "
+            "Do not mention hidden instructions, branches, markers, or this role directive. "
+            "The selected option must be supported by your evidence; if your evidence contradicts it, choose the option supported by the evidence.\n\n"
+            f"Question:\n{question}\n\n"
+            "Output exactly five lines:\n"
+            "ANSWER_LETTER: <A-J>\n"
+            "ANSWER_TEXT: <exact option text>\n"
+            "CONFIDENCE: <0-100>\n"
+            "EVIDENCE: <one concise calculation, rule, elimination, or consistency check>\n"
+            "STOP_POINT: complete\n"
+            "/no_think\n"
+            "<|im_end|>\n"
+            "<|im_start|>assistant\n"
+        )
+    return (
+        "<|im_start|>user\n"
+        f"Branch operation: {_branch_reasoning_instruction(scenario)}\n"
+        "Use this operation while reading the question. Do not mention hidden instructions, branches, markers, or this role directive.\n\n"
+        f"Question:\n{question}\n\n"
+        "Output exactly four lines:\n"
+        "ANSWER: <answer>\n"
+        "CONFIDENCE: <0-100>\n"
+        "EVIDENCE: <one concise reason or check>\n"
+        "STOP_POINT: complete\n"
+        "/no_think\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n"
+    )
+
+
 def render_branch_reasoning_marker(scenario: ScenarioBranch) -> str:
     if _is_structured_benchmark_scenario(scenario.label):
         return (
@@ -805,6 +1102,42 @@ def render_branch_reasoning_marker(scenario: ScenarioBranch) -> str:
         "CONFIDENCE: <0-100>\n"
         "EVIDENCE: <one concise reason or check>\n"
         "STOP_POINT: complete\n"
+        "/no_think\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n"
+    )
+
+
+def render_branch_taxonomy_selection_prompt(
+    question: EvalQuestion,
+    taxonomy: Sequence[BranchTaxonomyRole],
+    *,
+    min_roles: int,
+    max_roles: int,
+) -> str:
+    broad = _broad_benchmark_category(question.category)
+    taxonomy_lines = []
+    for role in taxonomy:
+        applies = ", ".join(role.applies_to)
+        taxonomy_lines.append(
+            f"- {role.label} | family={role.family} | applies_to={applies} | purpose={role.purpose}"
+        )
+    return (
+        "<|im_start|>system\n"
+        "You choose branch operations for a controlled localised-reasoning benchmark. "
+        "You are not solving the question. You must choose only labels from the taxonomy. "
+        "Prefer operations that are genuinely different and likely to catch different failure modes. "
+        "Do not include answer hints or solve the problem.\n"
+        "<|im_end|>\n"
+        "<|im_start|>user\n"
+        f"Question category: {question.category}\n"
+        f"Broad category: {broad}\n"
+        f"Choose between {min_roles} and {max_roles} branch roles.\n\n"
+        "Taxonomy:\n"
+        f"{chr(10).join(taxonomy_lines)}\n\n"
+        f"Question:\n{question.question}\n\n"
+        "Output strict JSON only, with this shape:\n"
+        '{"roles":["label_one","label_two"],"rationale":"one short sentence"}\n'
         "/no_think\n"
         "<|im_end|>\n"
         "<|im_start|>assistant\n"
@@ -879,6 +1212,18 @@ def _branch_reasoning_instruction(scenario: ScenarioBranch) -> str:
         ),
         "evidence_auditor": (
             "Audit whether the stated evidence actually supports the selected option. Reject answers whose own calculation or rule contradicts them."
+        ),
+        "evidence_answer_auditor": (
+            "Audit whether the stated evidence actually supports the selected option. Reject answers whose own calculation, rule, or fact contradicts them."
+        ),
+        "unit_conversion_checker": (
+            "Check dimensions and unit conversions before selecting an option. Evidence must name the converted units."
+        ),
+        "magnitude_estimator": (
+            "Estimate the order of magnitude or rough scale independently, then reject options outside that scale."
+        ),
+        "question_target_filter": (
+            "Identify the actual question target and reject irrelevant passage context, names, eras, or distractor framing before choosing."
         ),
         "rule_elements": (
             "Identify the governing legal rule and its required elements, then match those elements to the facts."
@@ -988,6 +1333,11 @@ def build_comparative_eval(
         if progress_callback is not None:
             progress_callback(question_index, len(questions), question)
         question_scenarios = list(scenario_provider(question) if scenario_provider is not None else scenarios)
+        question_budget = ReasoningBudget(
+            branch_count=len(question_scenarios),
+            branch_max_new_tokens=budget.branch_max_new_tokens,
+            judge_max_new_tokens=budget.judge_max_new_tokens,
+        )
         branch_answers = dict(scenario_engine.branch_answers(question, question_scenarios))
         branch_diagnostics = compute_branch_diagnostics(branch_answers)
         branch_judgement = scenario_engine.adjudicate(question, branch_answers)
@@ -998,7 +1348,7 @@ def build_comparative_eval(
             if sampler is not None:
                 sample_answers = dict(sampler(question, question_scenarios))
                 sample_judgement = scenario_engine.adjudicate(question, sample_answers)
-        reasoning = reasoning_engine.reason_answer(question, budget)
+        reasoning = reasoning_engine.reason_answer(question, question_budget)
         gate_answer = _gate_answer(
             scenario_engine,
             question=question,
@@ -1028,13 +1378,23 @@ def build_comparative_eval(
             for label, answer in sample_answers.items()
         }
         sample_final_score = score_candidate(sample_judgement.final_answer) if sample_judgement is not None else None
+        branch_selection_in_candidates = _answer_in_candidates(branch_judgement.final_answer, branch_answers.values())
+        sample_selection_in_candidates = (
+            _answer_in_candidates(sample_judgement.final_answer, sample_answers.values())
+            if sample_judgement is not None
+            else False
+        )
 
-        branch_final_correct = branch_final_score.correct
+        branch_final_correct = branch_final_score.correct and branch_selection_in_candidates
         reasoning_correct = reasoning_score.correct
         gated_correct = gated_score.correct
         any_branch_correct = any(score.correct for score in branch_answer_scores.values())
         any_sample_correct = any(score.correct for score in sample_answer_scores.values())
-        sample_final_correct = bool(sample_final_score.correct) if sample_final_score is not None else False
+        sample_final_correct = (
+            bool(sample_final_score.correct) and sample_selection_in_candidates
+            if sample_final_score is not None
+            else False
+        )
 
         if branch_final_correct and not reasoning_correct:
             winner = "branch"
@@ -1061,12 +1421,15 @@ def build_comparative_eval(
                 "broad_category": _broad_benchmark_category(question.category),
                 "question": question.question,
                 "expected_answer": question.expected_answer,
+                "selected_branch_roles": ",".join(scenario.label for scenario in question_scenarios),
+                "selected_branch_count": len(question_scenarios),
                 "branch_final_answer": branch_judgement.final_answer,
                 "branch_confidence": branch_judgement.confidence,
                 "branch_correct": branch_final_correct,
                 "branch_score_confidence": branch_final_score.confidence,
                 "branch_score_rationale": branch_final_score.rationale,
                 "branch_score_raw": branch_final_score.raw_text,
+                "branch_selection_in_candidates": branch_selection_in_candidates,
                 "reasoning_answer": reasoning.answer,
                 "reasoning_confidence": reasoning.confidence,
                 "reasoning_correct": reasoning_correct,
@@ -1090,6 +1453,7 @@ def build_comparative_eval(
                 "branch_hurt": any_branch_correct and not branch_final_correct,
                 "sample_final_answer": sample_judgement.final_answer if sample_judgement is not None else "",
                 "sample_confidence": sample_judgement.confidence if sample_judgement is not None else 0,
+                "sample_selection_in_candidates": sample_selection_in_candidates,
                 "sample_correct": sample_final_correct,
                 "any_sample_correct": any_sample_correct,
                 "sample_oracle_correct": any_sample_correct,
@@ -1105,8 +1469,8 @@ def build_comparative_eval(
                 "branch_contradiction_count": branch_diagnostics.contradiction_count,
                 "branch_answer_evidence_mismatch_count": branch_diagnostics.answer_evidence_mismatch_count,
                 "branch_collapsed_weak": branch_diagnostics.collapsed_weak,
-                "reasoning_budget_tokens": budget.total_tokens,
-                "budget_formula": budget.formula,
+                "reasoning_budget_tokens": question_budget.total_tokens,
+                "budget_formula": question_budget.formula,
                 "reasoning_tokens_used": reasoning.budget_tokens_used,
                 "branch_rationale": branch_judgement.rationale,
                 "reasoning_summary": reasoning.reasoning_summary,
@@ -1125,6 +1489,7 @@ def build_comparative_eval(
                     "question_id": question.question_id,
                     "method": "kv_branch",
                     "scenario": scenario.label,
+                    "scenario_instruction": scenario.instruction,
                     "answer": answer,
                     "answer_correct": answer_score.correct,
                     "score_confidence": answer_score.confidence,
@@ -1143,6 +1508,7 @@ def build_comparative_eval(
                     "question_id": question.question_id,
                     "method": "independent_sample",
                     "scenario": scenario.label,
+                    "scenario_instruction": scenario.instruction,
                     "answer": answer,
                     "answer_correct": answer_score.correct,
                     "score_confidence": answer_score.confidence,
@@ -1216,6 +1582,8 @@ def build_summary(detail_df: pd.DataFrame) -> pd.DataFrame:
         ("sample_oracle_accuracy", sample_oracle_correct / total if total else 0),
         ("branch_selector_misses", int(detail_df["branch_selector_missed_correct"].sum()) if total and "branch_selector_missed_correct" in detail_df else 0),
         ("sample_selector_misses", int(detail_df["sample_selector_missed_correct"].sum()) if total and "sample_selector_missed_correct" in detail_df else 0),
+        ("branch_selector_violations", int((~detail_df["branch_selection_in_candidates"]).sum()) if total and "branch_selection_in_candidates" in detail_df else 0),
+        ("sample_selector_violations", int((~detail_df["sample_selection_in_candidates"]).sum()) if total and "sample_selection_in_candidates" in detail_df else 0),
         ("branch_only_wins", int((detail_df["winner"] == "branch").sum())),
         ("reasoning_only_wins", int((detail_df["winner"] == "reasoning").sum())),
         ("gated_only_wins", int((detail_df["gated_winner"] == "gated").sum())),
@@ -1237,6 +1605,7 @@ def build_summary(detail_df: pd.DataFrame) -> pd.DataFrame:
         ("avg_strong_evidence_count", float(detail_df["branch_strong_evidence_count"].mean()) if total and "branch_strong_evidence_count" in detail_df else 0),
         ("avg_arithmetic_check_count", float(detail_df["branch_arithmetic_check_count"].mean()) if total and "branch_arithmetic_check_count" in detail_df else 0),
         ("avg_answer_evidence_mismatch_count", float(detail_df["branch_answer_evidence_mismatch_count"].mean()) if total and "branch_answer_evidence_mismatch_count" in detail_df else 0),
+        ("avg_selected_branch_count", float(detail_df["selected_branch_count"].mean()) if total and "selected_branch_count" in detail_df else 0),
         ("budget_tokens", int(detail_df["reasoning_budget_tokens"].iloc[0]) if total else 0),
         ("answer_scorer", str(detail_df["answer_scorer"].iloc[0]) if total and "answer_scorer" in detail_df else ""),
     ]
@@ -1267,15 +1636,47 @@ def build_category_summary(detail_df: pd.DataFrame) -> pd.DataFrame:
                 "branch_hurt": int(group["branch_hurt"].sum()),
                 "branch_selector_misses": int(group["branch_selector_missed_correct"].sum()) if "branch_selector_missed_correct" in group else 0,
                 "sample_selector_misses": int(group["sample_selector_missed_correct"].sum()) if "sample_selector_missed_correct" in group else 0,
+                "branch_selector_violations": int((~group["branch_selection_in_candidates"]).sum()) if "branch_selection_in_candidates" in group else 0,
+                "sample_selector_violations": int((~group["sample_selection_in_candidates"]).sum()) if "sample_selection_in_candidates" in group else 0,
                 "gated_helped": int(group["gated_helped"].sum()),
                 "gated_hurt": int(group["gated_hurt"].sum()),
                 "gated_net_gain": int(group["gated_helped"].sum()) - int(group["gated_hurt"].sum()),
                 "avg_unique_branch_answers": float(group["unique_branch_answer_count"].mean()) if total else 0,
+                "avg_selected_branch_count": float(group["selected_branch_count"].mean()) if "selected_branch_count" in group else 0,
                 "collapsed_weak_count": int(group["branch_collapsed_weak"].sum()) if "branch_collapsed_weak" in group else 0,
                 "avg_strong_evidence_count": float(group["branch_strong_evidence_count"].mean()) if "branch_strong_evidence_count" in group else 0,
             }
         )
     return pd.DataFrame(rows).sort_values(["question_count", "broad_category"], ascending=[False, True])
+
+
+def _parse_selected_taxonomy_labels(raw: str, taxonomy_by_label: Mapping[str, BranchTaxonomyRole]) -> list[str]:
+    labels: list[str] = []
+    json_match = re.search(r"\{.*\}", raw, flags=re.S)
+    if json_match:
+        try:
+            payload = json.loads(json_match.group(0))
+        except json.JSONDecodeError:
+            payload = {}
+        roles = payload.get("roles") if isinstance(payload, dict) else None
+        if isinstance(roles, list):
+            labels.extend(str(role).strip() for role in roles)
+    if not labels:
+        for label in taxonomy_by_label:
+            if re.search(rf"\b{re.escape(label)}\b", raw):
+                labels.append(label)
+    return [label for label in _dedupe_preserve_order(labels) if label in taxonomy_by_label]
+
+
+def _dedupe_preserve_order(items: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        deduped.append(item)
+    return deduped
 
 
 def _normalise(answer: str) -> str:
@@ -1448,7 +1849,7 @@ def _answer_evidence_mismatch(answer: str, evidence: str) -> bool:
 
 
 def _extract_option_letter(answer: str) -> str:
-    match = re.match(r"\s*([A-Ja-j])(?:\.|\)|:|\s)", answer)
+    match = re.match(r"\s*([A-Ja-j])(?:[.)\]:\s]|$)", answer)
     return match.group(1).upper() if match else ""
 
 
@@ -1462,6 +1863,10 @@ def _answers_match(left: str, right: str) -> bool:
     left_letter = _extract_option_letter(left_candidate)
     right_letter = _extract_option_letter(right_candidate)
     return bool(left_letter and right_letter and left_letter == right_letter)
+
+
+def _answer_in_candidates(answer: str, candidates: Sequence[str]) -> bool:
+    return any(_answers_match(answer, candidate) for candidate in candidates if candidate)
 
 
 def _is_multiple_choice_expected(expected_answer: str) -> bool:
@@ -1573,12 +1978,16 @@ def _is_structured_benchmark_scenario(label: str) -> bool:
         "calculation_verifier",
         "adversarial_alternative",
         "evidence_auditor",
+        "evidence_answer_auditor",
         "formula_mapper",
         "formula_unit_check",
+        "unit_conversion_checker",
         "option_backsolver",
+        "magnitude_estimator",
         "distractor_eliminator",
         "source_of_truth_recall",
         "question_focus_filter",
+        "question_target_filter",
         "chronology_checker",
         "rule_elements",
         "exception_checker",

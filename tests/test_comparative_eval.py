@@ -8,13 +8,17 @@ from localised_reasoning.comparative_eval import (
     DEFAULT_BRANCH_REASONING_TOKENS,
     DEFAULT_SELECTOR_TOKENS,
     WorkerAnswerScorer,
+    benchmark_branch_taxonomy,
     build_comparative_eval,
     compute_branch_diagnostics,
     default_benchmark_scenarios,
     default_real_world_eval_questions,
     export_comparative_eval_excel,
+    fallback_taxonomy_scenarios,
     render_adjudication_prompt,
     render_answer_scoring_prompt,
+    render_branch_role_question_marker,
+    render_branch_taxonomy_selection_prompt,
     render_branch_reasoning_marker,
     render_meta_gate_prompt,
     render_reasoning_prompt,
@@ -225,6 +229,63 @@ class ComparativeEvalTest(unittest.TestCase):
         self.assertIn("named operation", marker)
         self.assertIn("contradicts", marker)
 
+    def test_branch_taxonomy_has_operational_roles(self):
+        labels = {role.label for role in benchmark_branch_taxonomy()}
+
+        self.assertIn("question_target_filter", labels)
+        self.assertIn("formula_mapper", labels)
+        self.assertIn("unit_conversion_checker", labels)
+        self.assertIn("option_backsolver", labels)
+        self.assertIn("evidence_answer_auditor", labels)
+
+        physics_question = default_real_world_eval_questions()[0]
+        physics_question = type(physics_question)(
+            "p1",
+            "mmlu-pro/physics/example",
+            "How far does a muon travel?",
+            "A. 4.2",
+            ("A",),
+        )
+        selected = fallback_taxonomy_scenarios(physics_question)
+        selected_labels = [scenario.label for scenario in selected]
+        self.assertIn("formula_mapper", selected_labels)
+        self.assertIn("unit_conversion_checker", selected_labels)
+
+    def test_role_before_question_marker_places_operation_before_question(self):
+        scenario = fallback_taxonomy_scenarios(
+            type(default_real_world_eval_questions()[0])(
+                "p1",
+                "mmlu-pro/physics/example",
+                "Question body",
+                "A. answer",
+                ("A",),
+            )
+        )[0]
+        marker = render_branch_role_question_marker(scenario, "Question body")
+
+        self.assertLess(marker.index("Branch operation:"), marker.index("Question:"))
+        self.assertIn("ANSWER_LETTER:", marker)
+        self.assertIn("STOP_POINT:", marker)
+
+    def test_taxonomy_selection_prompt_does_not_include_expected_answer(self):
+        question = type(default_real_world_eval_questions()[0])(
+            "p1",
+            "mmlu-pro/physics/example",
+            "How far does a particle travel?",
+            "A. hidden expected",
+            ("A",),
+        )
+        prompt = render_branch_taxonomy_selection_prompt(
+            question,
+            benchmark_branch_taxonomy(),
+            min_roles=3,
+            max_roles=5,
+        )
+
+        self.assertIn("strict JSON", prompt)
+        self.assertIn("formula_mapper", prompt)
+        self.assertNotIn(question.expected_answer, prompt)
+
     def test_branch_diagnostics_flag_collapsed_thin_evidence(self):
         diagnostics = compute_branch_diagnostics(
             {
@@ -237,6 +298,13 @@ class ComparativeEvalTest(unittest.TestCase):
         self.assertEqual(diagnostics.unique_answer_count, 1)
         self.assertTrue(diagnostics.collapsed_weak)
         self.assertEqual(diagnostics.thin_evidence_count, 3)
+
+    def test_option_letter_only_matches_full_option_candidate(self):
+        from localised_reasoning.comparative_eval import _answers_match
+
+        self.assertTrue(_answers_match("I", "I. Asexual reproduction in bryophytes takes place through budding"))
+        self.assertTrue(_answers_match("H", "H. Regular activity"))
+        self.assertFalse(_answers_match("I", "H. Regular activity"))
 
     def test_branch_raw_scoring_uses_selected_answer_not_evidence(self):
         question = default_real_world_eval_questions()[1]

@@ -140,6 +140,29 @@ class LiveLlamaWorkerScaffoldTest(unittest.TestCase):
         self.assertEqual(worker.cached_generate_requests[1]["prefix_id"], "meta_gate_prefix_v1")
         self.assertEqual(gate.final_answer, "literal")
 
+    def test_role_before_question_layout_forks_before_question_suffix(self):
+        worker = CachedFakeWorker()
+        engine = LiveLlamaComparativeEngine(
+            model_path=Path("unused.gguf"),
+            worker=worker,
+            branch_layout="role-before-question",
+        )
+        question = EvalQuestion(
+            "t1",
+            "mmlu-pro/physics/example",
+            "How far does the particle travel?",
+            "A. 4.2",
+            ("A",),
+        )
+
+        engine.branch_answers(question, default_scenarios()[:2])
+
+        request = worker.cached_branch_requests[0]
+        self.assertEqual(request["suffix"], "")
+        first_marker = request["branches"][0].marker
+        self.assertLess(first_marker.index("Branch operation:"), first_marker.index("Question:"))
+        self.assertIn(question.question, first_marker)
+
 
 if __name__ == "__main__":
     unittest.main()

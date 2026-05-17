@@ -30,6 +30,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--request-timeout-s", type=float)
     parser.add_argument("--progress-every", type=int, default=1)
+    parser.add_argument(
+        "--scenario-mode",
+        choices=["fixed", "taxonomy-category", "taxonomy-model"],
+        default="fixed",
+    )
+    parser.add_argument(
+        "--branch-layout",
+        choices=["late-question-fork", "role-before-question"],
+        default="late-question-fork",
+        help="late-question-fork is the efficient branch-continuation architecture; role-before-question is a diagnostic accuracy probe.",
+    )
+    parser.add_argument("--taxonomy-min-roles", type=int, default=3)
+    parser.add_argument("--taxonomy-max-roles", type=int, default=5)
+    parser.add_argument("--taxonomy-selector-max-new-tokens", type=int, default=128)
     parser.add_argument("--output-dir", type=Path, default=Path("reports/model_preset_matrix"))
     parser.add_argument("--output-xlsx", type=Path, default=Path("reports/model_preset_matrix.xlsx"))
     parser.add_argument("--continue-on-error", action="store_true")
@@ -89,6 +103,16 @@ def main() -> int:
             str(args.limit),
             "--progress-every",
             str(args.progress_every),
+            "--scenario-mode",
+            args.scenario_mode,
+            "--branch-layout",
+            args.branch_layout,
+            "--taxonomy-min-roles",
+            str(args.taxonomy_min_roles),
+            "--taxonomy-max-roles",
+            str(args.taxonomy_max_roles),
+            "--taxonomy-selector-max-new-tokens",
+            str(args.taxonomy_selector_max_new_tokens),
             "--output-xlsx",
             str(args.output_dir / f"{stem}.xlsx"),
             "--detail-csv",

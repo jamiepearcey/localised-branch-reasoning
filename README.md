@@ -403,6 +403,50 @@ and chooses between the branch selector candidate and the monolithic reasoning
 candidate. If all branches collapse to one thin answer, the explicit diversity
 gate prefers the baseline unless the branch and baseline already agree.
 
+The benchmark runner can also use a controlled branch taxonomy and let the
+resident model choose the branch roles per question. This is bounded: the model
+chooses from named operations such as `question_target_filter`,
+`formula_mapper`, `unit_conversion_checker`, `option_backsolver`,
+`magnitude_estimator`, `source_of_truth_recall`, `rule_elements`,
+`exception_checker`, `distractor_eliminator`, and
+`evidence_answer_auditor`; it does not invent free-form roles.
+
+```bash
+PYTHONPATH=src python3 scripts/run_comparative_eval.py \
+  --engine worker \
+  --question-source mmlu-pro \
+  --limit 25 \
+  --model-preset qwen3-30b-a3b \
+  --scenario-mode taxonomy-model \
+  --branch-layout late-question-fork \
+  --output-xlsx reports/comparative_eval_taxonomy_model.xlsx
+```
+
+`--scenario-mode fixed` keeps the older fixed five-role benchmark.
+`--scenario-mode taxonomy-category` uses a deterministic category-to-role
+mapping without paying for model role selection. `--scenario-mode
+taxonomy-model` asks the loaded model to choose 3-5 roles from the taxonomy for
+each question. The selected roles are written to `selected_branch_roles` and
+`selected_branch_count` in the per-question output.
+
+`--branch-layout late-question-fork` is the original efficient path:
+
+```text
+static prefix -> question -> KV fork -> branch operation
+```
+
+`--branch-layout role-before-question` keeps static-prefix KV reuse but forks
+before the branch operation and question:
+
+```text
+static prefix -> KV fork -> branch operation + question
+```
+
+The second layout costs more question-token compute and is not the primary
+branch-continuation architecture. Use it only as a diagnostic accuracy probe to
+test whether earlier role conditioning escapes a bad shared question
+interpretation.
+
 You can restrict by broad MMLU-Pro categories:
 
 ```bash
@@ -474,3 +518,129 @@ per-sequence KV layout aborts on `llama_memory_seq_cp`. It is intended for local
 added. The single-shot `llama_seq_fork_demo` is the proof report generator; the
 persistent `llama_branch_worker` is the Python-facing live API for comparative
 experiments.
+
+## Long Decision Localisation
+
+The short-answer benchmark is not the strongest test of localized reasoning.
+For the architecture's intended use case, use the synthetic long-decision
+workflow:
+
+```bash
+PYTHONPATH=src python3 scripts/run_long_decision_eval.py \
+  --engine worker \
+  --model-preset qwen3-30b-a3b \
+  --ctx-size 4096 \
+  --limit 3 \
+  --output-xlsx reports/long_decision_30b_aggregate_000_003.xlsx
+```
+
+Each case contains a long decision context and a bounded factor catalog. The
+resident model first decides whether to branch and which factors to evaluate.
+The runtime then uses the efficient continuation architecture:
+
+```text
+static prefix + case context + planner decision -> KV fork -> one factor marker per branch
+completed factor artifacts -> final aggregation pass -> one collapsed decision
+```
+
+The comparison baselines are:
+
+- `forked_branch`: factor continuations from a shared case KV state
+- `forked_aggregate`: final decision collapsed from completed independent
+  factor artifacts
+- `sequential`: a true accumulating context where each factor sees previous
+  factor outputs
+- `monolithic`: one integrated decision pass
+
+The output workbook contains planner choices, raw forked branch outputs,
+the forked and sequential aggregate decisions, monolithic answers, deterministic
+focus/contamination metrics, and an LLM judge sheet. The judge scores final
+decisions on groundedness, factor coverage, synthesis quality, risk handling,
+actionability, and overall quality. The contamination scorer ignores explicit
+`TRADEOFF_BOUNDARY` text so branches are not penalized for naming what they
+intentionally did not decide.
+
+## Coding Checkpoint Branching
+
+For coding tasks, use the multi-checkpoint branch/collapse workflow:
+
+```bash
+PYTHONPATH=src python3 scripts/run_coding_branch_eval.py \
+  --engine worker \
+  --model-preset qwen3-30b-a3b \
+  --ctx-size 4096 \
+  --limit 2 \
+  --consideration-limit 4 \
+  --output-xlsx reports/coding_branch_30b_000_002.xlsx
+```
+
+This workflow asks the model to choose high-risk method checkpoints, with the
+planner prompt explicitly preferring method start, before mutation, external
+side-effect boundaries, loops/batches, and method end. At each selected
+checkpoint, the runtime forks localized branches for coding considerations such
+as contract, edge cases, state consistency, security, performance, and tests.
+Those branches are collapsed into a checkpoint artifact. The final pass then
+collapses all checkpoint artifacts into one patch/test plan.
+
+The efficient shape is:
+
+```text
+code context + active checkpoint -> KV fork -> consideration branches
+consideration artifacts -> checkpoint collapse
+checkpoint collapses -> final patch plan
+```
+
+The report includes selected checkpoints, branch outputs, checkpoint collapses,
+the final branch-derived patch plan, a monolithic comparator, and simple
+checkpoint/locality metrics.
+
+## SWE-bench Lite / Verified
+
+The SWE-bench runner applies the same checkpoint branch/collapse architecture
+to real SWE-bench Lite or Verified instances:
+
+```bash
+PYTHONPATH=src python3 scripts/run_swebench_branch_eval.py \
+  --engine worker \
+  --dataset lite \
+  --model-preset qwen3-30b-a3b \
+  --ctx-size 8192 \
+  --limit 1 \
+  --max-files 2 \
+  --output-dir reports/swebench_lite_branch_000_001 \
+  --output-xlsx reports/swebench_lite_branch_000_001.xlsx
+```
+
+The runner fetches the public SWE-bench row from Hugging Face, uses the gold
+patch only to identify file paths for source context, then fetches the base
+commit source from GitHub raw URLs. The gold patch and test patch are not
+included in the model prompt. This is an oracle-file-localization setup, not a
+fully autonomous repository agent.
+
+The output directory contains two harness-compatible prediction files:
+
+```text
+swebench_branch_predictions.jsonl
+swebench_monolithic_predictions.jsonl
+```
+
+Each row uses the official SWE-bench prediction shape:
+
+```json
+{"instance_id": "...", "model_name_or_path": "...", "model_patch": "diff --git ..."}
+```
+
+To score a generated file with the official Docker harness:
+
+```bash
+python -m swebench.harness.run_evaluation \
+  --dataset_name princeton-nlp/SWE-bench_Lite \
+  --predictions_path reports/swebench_lite_branch_000_001/swebench_branch_predictions.jsonl \
+  --instance_ids <instance_id> \
+  --max_workers 1 \
+  --run_id localised-branch-lite-000-001
+```
+
+On Apple Silicon, SWE-bench documents ARM evaluation as experimental and notes
+that `--namespace ''` forces local image builds instead of pulling Linux images.
+For serious pass/fail runs, use a Linux Docker host or a cloud runner.
