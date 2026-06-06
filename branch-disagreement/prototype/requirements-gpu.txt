@@ -1,0 +1,21 @@
+# GPU-box requirements. Installed by deploy/vast_setup.sh inside a venv.
+#
+# Pinned to a CUDA 12.8 stack. cu128 wheels run on driver >= 570 AND on newer
+# CUDA-13 boxes (backward compatible), so this is the safe universal choice.
+# Letting pip auto-resolve vLLM pulls a CUDA-13 torch build that fails on
+# driver < 580 — hence the explicit pins.
+#
+# vast_setup.sh installs torch first from the cu128 index, then the rest:
+#   pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+#   pip install vllm==0.10.1.1 transformers datasets accelerate huggingface_hub
+#
+# This file documents the same set for reference / manual installs.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.1
+vllm==0.10.1.1
+# transformers <5: vLLM 0.10 targets the 4.x API; 5.x removed slow-tokenizer
+# attrs (all_special_tokens_extended) that vLLM uses.
+transformers>=4.55,<5
+huggingface_hub<1
+datasets
+accelerate

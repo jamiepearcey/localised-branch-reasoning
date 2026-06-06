@@ -1,0 +1,23 @@
+# deployment secrets / connection details
+deploy/config.env
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# run artifacts (regenerated on each run)
+prototype/reports/*
+!prototype/reports/.gitkeep
+prototype/data/cache/
+*.log
+
+# datasets / model caches pulled at runtime
+prototype/data/benchmarks/*.csv
+hf_cache/
+
+# os
+.DS_Store

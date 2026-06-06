@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "branch-disagreement"
+version = "0.1.0"
+description = "Cheap hallucination detection via disagreement across prefix-shared reasoning branches"
+requires-python = ">=3.9"
+# Core has NO runtime dependencies: pure-stdlib logic + proxy runner + metrics.
+dependencies = []
+
+[project.optional-dependencies]
+# Installed on the vast.ai GPU box by deploy/vast_setup.sh. Versions are loose
+# because the rented base image's CUDA/torch dictate the compatible vllm build.
+gpu = [
+    "vllm>=0.6.0",
+    "transformers>=4.44",
+    "datasets>=2.20",
+    "torch>=2.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
